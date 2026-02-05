@@ -1,0 +1,145 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  
+  cloud:
+    gateway:
+      default-filters:
+        - name: Retry
+          args:
+            retries: 3
+            statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE
+            methods: GET,POST
+            backoff:
+              firstBackoff: 100ms
+              maxBackoff: 500ms
+              factor: 2
+              basedOnPreviousValue: false
+      
+      routes:
+        # Merchant Service routes
+        - id: merchant-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/merchants/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.requestedTokens: 1
+            - name: CircuitBreaker
+              args:
+                name: merchantService
+                fallbackUri: forward:/fallback/merchant
+            - RewritePath=/api/v1/merchants/(?<segment>.*), /api/${segment}
+            - AddResponseHeader=X-Service-Name, merchant-service
+        
+        # Catalog Service routes
+        - id: catalog-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/catalog/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 200
+                redis-rate-limiter.burstCapacity: 400
+            - name: CircuitBreaker
+              args:
+                name: catalogService
+                fallbackUri: forward:/fallback/catalog
+            - RewritePath=/api/v1/catalog/(?<segment>.*), /api/${segment}
+            - AddResponseHeader=X-Service-Name, catalog-service
+        
+        # Settlement Service routes
+        - id: settlement-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/settlements/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+            - name: CircuitBreaker
+              args:
+                name: settlementService
+                fallbackUri: forward:/fallback/settlement
+            - RewritePath=/api/v1/settlements/(?<segment>.*), /api/${segment}
+            - AddResponseHeader=X-Service-Name, settlement-service
+      
+      discovery:
+        locator:
+          enabled: false
+  
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway,prometheus
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      merchantService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      catalogService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      settlementService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    instances:
+      merchantService:
+        timeoutDuration: 5s
+      catalogService:
+        timeoutDuration: 5s
+      settlementService:
+        timeoutDuration: 10s
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+    io.github.resilience4j: DEBUG
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - url: /v3/api-docs/merchant-service
+        name: Merchant Service
+      - url: /v3/api-docs/catalog-service
+        name: Catalog Service
+      - url: /v3/api-docs/settlement-service
+        name: Settlement Service
