@@ -1,0 +1,56 @@
+{
+  "analysis": {
+    "analyzer": {
+      "standard": {
+        "type": "standard",
+        "stopwords": "_english_"
+      },
+      "keyword_analyzer": {
+        "type": "custom",
+        "tokenizer": "keyword",
+        "filter": ["lowercase"]
+      }
+    },
+    "normalizer": {
+      "lowercase_normalizer": {
+        "type": "custom",
+        "char_filter": [],
+        "filter": ["lowercase"]
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "merchantId": { "type": "keyword" },
+      "name": { 
+        "type": "text",
+        "analyzer": "standard",
+        "fields": {
+          "keyword": { "type": "keyword", "normalizer": "lowercase_normalizer" }
+        }
+      },
+      "description": { "type": "text", "analyzer": "standard" },
+      "category": { "type": "keyword" },
+      "tags": { "type": "keyword" },
+      "price": {
+        "properties": {
+          "amount": { "type": "double" },
+          "currency": { "type": "keyword" }
+        }
+      },
+      "costPrice": {
+        "properties": {
+          "amount": { "type": "double" },
+          "currency": { "type": "keyword" }
+        }
+      },
+      "stockQuantity": { "type": "integer" },
+      "status": { "type": "keyword" },
+      "imageUrl": { "type": "keyword" },
+      "imageUrls": { "type": "keyword" },
+      "createdAt": { "type": "date", "format": "date_time" },
+      "updatedAt": { "type": "date", "format": "date_time" }
+    }
+  }
+}

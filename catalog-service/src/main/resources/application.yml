@@ -1,0 +1,57 @@
+server:
+  port: 8082
+  shutdown: graceful
+
+spring:
+  application:
+    name: catalog-service
+  
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+  
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+  
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: catalog-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.coupang.merchant.event
+        spring.json.type.mapping: product.events:com.coupang.merchant.event.ProductEvents
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    root: INFO
+    com.coupang.merchant: DEBUG
+    org.springframework.kafka: INFO
+    org.springframework.data.elasticsearch: DEBUG
+
+api:
+  version: v1
+  base-path: /api/${api.version}
